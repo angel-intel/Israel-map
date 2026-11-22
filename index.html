@@ -80,8 +80,11 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke
 .stack{display:flex;flex-direction:column;border-radius:24px;overflow:hidden}
 .stack button{width:48px;height:48px;display:grid;place-items:center}.stack button+button{border-top:.5px solid var(--line)}
 .stack button.on{color:var(--blue)}
-.styles{position:fixed;right:70px;bottom:calc(env(safe-area-inset-bottom) + 108px);border-radius:20px;padding:8px;display:flex;gap:8px;z-index:999;transform-origin:100% 100%;transform:scale(.6);opacity:0;pointer-events:none;transition:.3s cubic-bezier(.3,1.3,.5,1)}
+.styles{position:fixed;right:70px;bottom:calc(env(safe-area-inset-bottom) + 108px);border-radius:20px;padding:8px;display:flex;flex-direction:column;gap:8px;z-index:999;transform-origin:100% 100%;transform:scale(.6);opacity:0;pointer-events:none;transition:.3s cubic-bezier(.3,1.3,.5,1)}
 .styles.on{transform:none;opacity:1;pointer-events:auto}
+.srow{display:flex;gap:8px}.styles .lab{font-size:12px;font-weight:700;color:var(--sub);padding:2px 6px 0}
+.seg{display:flex;background:var(--soft);border-radius:14px;padding:3px;position:relative}.seg button{flex:1;width:auto!important;height:36px;padding:0!important;border-radius:11px!important;font-size:13px!important;flex-direction:row!important;transition:.25s}.seg button.on{background:var(--blue);color:#fff!important}
+.ctip{background:transparent;border:0;box-shadow:none;font:700 12px Heebo,sans-serif;color:#15171c;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff}.ctip::before{display:none}
 .styles button{width:76px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:500;padding:6px 0;border-radius:14px}
 .styles .th{width:60px;height:46px;border-radius:12px;box-shadow:inset 0 0 0 2px transparent;transition:.25s}
 .styles button.on .th{box-shadow:inset 0 0 0 3px var(--blue)}.styles button.on{color:var(--blue)}
@@ -171,9 +174,13 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke
   </div>
 </div>
 <div class="styles glass" id="styles">
+  <div class="srow">
   <button data-s="map" class="on"><span class="th" style="background:linear-gradient(135deg,#f2efe9 40%,#aad3df 40% 55%,#f2efe9 55%),#f2efe9;background-size:cover"></span>Map</button>
   <button data-s="sat"><span class="th" style="background:linear-gradient(160deg,#3d5a3a,#7a6a48 55%,#2f4a5e)"></span>Satellite</button>
   <button data-s="topo"><span class="th" style="background:repeating-radial-gradient(circle at 30% 60%,#e8e2c8 0 5px,#c9b98a 6px 7px)"></span>Terrain</button>
+  </div>
+  <div class="lab">City areas</div>
+  <div class="seg" id="cseg"><button data-c="off">Off</button><button data-c="whole">Whole</button><button data-c="halves">Halves</button></div>
 </div>
 
 <div class="back" id="back"></div>
@@ -203,6 +210,14 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke
     <button class="pill pri" id="eSave">Save</button>
   </div>
 </section>
+<section class="sheet" id="citySheet" aria-label="City area">
+  <div class="grab"></div>
+  <div style="display:flex;gap:12px;align-items:center"><span class="sw" id="cSw"></span><div><h2 id="cName" dir="auto"></h2><div class="sub" id="cInfo"></div></div></div>
+  <div class="acts">
+    <button class="pill" id="cClose">Close</button>
+    <button class="pill pri" id="cSave"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Save to my map</button>
+  </div>
+</section>
 <div class="toast glass" id="toast"><span id="toastT"></span><button class="pill" id="toastU">Undo</button></div>
 
 <script src="leaflet/leaflet.js"></script>
@@ -223,7 +238,7 @@ const ISR=L.latLngBounds([29.45,34.2],[33.35,35.9]);
 const map=L.map('map',{zoomControl:false,maxBounds:L.latLngBounds([28.6,33.2],[34.2,36.8]),maxBoundsViscosity:.9,minZoom:7,maxZoom:19,zoomSnap:.25,tap:false});
 map.fitBounds(ISR,{paddingTopLeft:[10,70],paddingBottomRight:[10,90]});
 map.attributionControl.setPrefix(false).setPosition('bottomright');
-L.control.scale({imperial:false,position:'bottomleft'}).addTo(map);
+L.control.scale({imperial:false,position:'bottomleft'}).addTo(map);window.ilMap=map;
 const BASE={
  map:L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}),
  sat:L.layerGroup([L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Imagery © Esri'}),
@@ -323,7 +338,7 @@ function setMode(m){mode=m;draft=[];draftLine=null;draftInfo=null;rTok++;
   $('#dockTools').classList.toggle('away',drawing);$('#dockDraft').classList.toggle('away',!drawing);
   const h=$('#hint');h.textContent=m==='pin'?'Tap the map to drop a pin':m==='area'?'Tap corners · tap the first point to close':'Tap the map to add stops';h.classList.toggle('on',m!=='pan');
   $('#rmode').classList.toggle('on',m==='route');
-  updDraft();renderDraft();render()}
+  updDraft();renderDraft();render();if(typeof drawCities==='function'&&cmode!=='off')drawCities()}
 $('#tools').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setMode(b.dataset.m===mode&&mode!=='pan'?'pan':b.dataset.m)});
 $('#rmode').onclick=e=>{const b=e.target.closest('button');if(!b)return;rmode=b.dataset.r;markR();save();reroute()};
 const markR=()=>document.querySelectorAll('#rmode button').forEach(b=>b.classList.toggle('on',b.dataset.r===rmode));
@@ -408,7 +423,73 @@ res.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dis
   if(pingM)map.removeLayer(pingM);pingM=L.marker(ll,{interactive:false,icon:L.divIcon({className:'',iconSize:[16,16],html:'<div class="ping"></div>'})}).addTo(map);
   const name=q.value;setTimeout(()=>toast(name,'Add pin',()=>{const it={id:uid(),type:'pin',name,color:DEF.pin,note:p.display_name.split(', ').slice(1,3).join(', '),pts:[[+ll[0].toFixed(6),+ll[1].toFixed(6)]],t:Date.now()};commit(()=>items.push(it));newIds.add(it.id);sel=it.id;render();if(pingM)map.removeLayer(pingM)}),1000)});
 
-markR();badge();setMode('pan');
+
+// ---- city areas: real municipal boundaries from OpenStreetMap (Overpass) ----
+const CK=KEY+'-cities';let cities={},cq=[];try{const o=JSON.parse(localStorage.getItem(CK));if(o){cities=o.c||{};cq=o.q||[]}}catch(e){}
+let cmode='off';try{cmode=localStorage.getItem(KEY+'-cmode')||'off'}catch(e){}
+const cvs=L.canvas({padding:.4}),cityL=L.layerGroup().addTo(map);const splitC={};
+const CS=Math.cos(rad(31.5));
+const segD=(p,a,b)=>{const ax=a[1]*CS,ay=a[0],bx=b[1]*CS,by=b[0],px=p[1]*CS,py=p[0],dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy;let t=l?((px-ax)*dx+(py-ay)*dy)/l:0;t=Math.max(0,Math.min(1,t));return Math.hypot(px-ax-t*dx,py-ay-t*dy)};
+function rdp(p,eps){if(p.length<3)return p;let dm=0,ix=0;const a=p[0],b=p[p.length-1];for(let i=1;i<p.length-1;i++){const d=segD(p[i],a,b);if(d>dm){dm=d;ix=i}}
+  if(dm>eps){const l=rdp(p.slice(0,ix+1),eps);return l.slice(0,-1).concat(rdp(p.slice(ix),eps))}return [a,b]}
+function stitch(ws){ws=ws.filter(w=>w.length>1).map(w=>w.slice());const rings=[],k=p=>p[0]+','+p[1];
+  while(ws.length){let r=ws.shift(),g=0;
+    while(k(r[0])!==k(r[r.length-1])&&g++<5000){const e=k(r[r.length-1]);const i=ws.findIndex(w=>k(w[0])===e||k(w[w.length-1])===e);if(i<0)break;const w=ws.splice(i,1)[0];if(k(w[0])!==e)w.reverse();r=r.concat(w.slice(1))}
+    if(r.length>3)rings.push(rdp(r,.00012).map(p=>[+p[0].toFixed(5),+p[1].toFixed(5)]))}
+  return rings.filter(r=>r.length>3)}
+const ringsArea=(o,i)=>Math.max(0,o.reduce((s,r)=>s+area(r),0)-i.reduce((s,r)=>s+area(r),0));
+function clipRing(r,ax,c,less){const inn=p=>less?p[ax]<=c:p[ax]>=c,out=[];
+  for(let j=0;j<r.length;j++){const A=r[j],B=r[(j+1)%r.length],ia=inn(A),ib=inn(B);if(ia)out.push(A);if(ia!==ib){const t=(c-A[ax])/(B[ax]-A[ax]);out.push([A[0]+(B[0]-A[0])*t,A[1]+(B[1]-A[1])*t])}}return out}
+const clipAll=(rs,ax,c,less)=>rs.map(r=>clipRing(r,ax,c,less)).filter(r=>r.length>2);
+const SIDE=[['דרום','צפון'],['מערב','מזרח']];
+function parts(id){const ct=cities[id];if(cmode!=='halves')return [{n:ct.n,o:ct.o,i:ct.i,a:ct.a,k:0}];
+  if(splitC[id])return splitC[id];
+  const all=ct.o.flat(),lats=all.map(p=>p[0]),lngs=all.map(p=>p[1]);
+  const y0=Math.min(...lats),y1=Math.max(...lats),x0=Math.min(...lngs),x1=Math.max(...lngs);
+  const ax=(x1-x0)*94.6>(y1-y0)*110.6?1:0;let lo=ax?x0:y0,hi=ax?x1:y1;
+  for(let t=0;t<22;t++){const m=(lo+hi)/2;const a=ringsArea(clipAll(ct.o,ax,m,true),clipAll(ct.i,ax,m,true));if(a<ct.a/2)lo=m;else hi=m}
+  const c=(lo+hi)/2;
+  return splitC[id]=[true,false].map((less,k)=>{const o=clipAll(ct.o,ax,c,less),i=clipAll(ct.i,ax,c,less);return {n:ct.n+' '+SIDE[ax][less?0:1],o,i,a:ringsArea(o,i),k}}).filter(p=>p.o.length)}
+const hueOf=(id,k)=>{const h=(id*137.508+k*150)%360;return `hsl(${h.toFixed(0)},68%,${k?44:50}%)`};
+function drawCities(){cityL.clearLayers();if(cmode==='off')return;const live=mode==='pan',z=map.getZoom(),vb=map.getBounds().pad(.5);
+  Object.keys(cities).forEach(id=>{const ct=cities[id];if(!ct||ct.skip)return;
+    if(!vb.intersects(L.latLngBounds(ct.b)))return;
+    parts(id).forEach(p=>{const col=hueOf(+id,p.k);
+      const pg=L.polygon([...p.o,...p.i],{renderer:cvs,color:col,weight:2,fillColor:col,fillOpacity:.22,interactive:live}).addTo(cityL);
+      pg.on('click',e=>{L.DomEvent.stopPropagation(e);openCity(p,col)});
+      if(z>=11.5){const big=p.o.reduce((a,r)=>area(r)>area(a)?r:a,p.o[0]);const c=L.polygon(big).getBounds().getCenter();
+        L.tooltip({permanent:true,direction:'center',className:'ctip',interactive:false}).setLatLng(c).setContent(esc(p.n)).addTo(cityL)}})})}
+let cBusy=false,cTimer=0,cityPart=null;
+function inQ(b){return cq.some(q=>L.latLngBounds(q).contains(b))}
+async function loadCities(){if(cmode==='off'||cBusy)return;if(map.getZoom()<9.5){drawCities();return}
+  const b=map.getBounds().pad(.15);if(inQ(b)){drawCities();return}
+  cBusy=true;toast('Loading city areas…');
+  const ids=Object.keys(cities);const bb=[b.getSouth(),b.getWest(),b.getNorth(),b.getEast()].map(n=>n.toFixed(4)).join(',');
+  const q=`[out:json][timeout:60];rel["boundary"="administrative"]["admin_level"="8"](${bb})->.a;`+(ids.length?`(.a; - rel(id:${ids.join(',')}););`:'.a;')+'out geom;';
+  try{const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q)});if(!r.ok)throw r.status;const j=await r.json();let n=0;
+    (j.elements||[]).forEach(el=>{if(el.type!=='relation'||!el.members)return;const t=el.tags||{},name=t['name:he']||t.name||t['name:en'];
+      const g=role=>el.members.filter(m=>m.type==='way'&&m.geometry&&(role==='outer'?m.role!=='inner':m.role==='inner')).map(m=>m.geometry.map(p=>[p.lat,p.lon]));
+      const o=stitch(g('outer')),i=stitch(g('inner'));const a=ringsArea(o,i);
+      if(!name||!o.length||a>300||/מועצה אזורית|Regional Council/i.test(name)){cities[el.id]={skip:1};return}
+      const all=o.flat();cities[el.id]={n:name.replace(/^(עיריית|מועצה מקומית)\s*/,''),o,i,a,b:[[Math.min(...all.map(p=>p[0])),Math.min(...all.map(p=>p[1]))],[Math.max(...all.map(p=>p[0])),Math.max(...all.map(p=>p[1]))]]};n++});
+    cq.push([[b.getSouth(),b.getWest()],[b.getNorth(),b.getEast()]]);
+    try{localStorage.setItem(CK,JSON.stringify({c:cities,q:cq}))}catch(e){}
+    toast(n?`Added ${n} cities`:'All cities here are loaded')}
+  catch(e){toast('Could not load city areas. Try again in a minute')}
+  cBusy=false;drawCities()}
+function setCmode(m){cmode=m;try{localStorage.setItem(KEY+'-cmode',m)}catch(e){}
+  document.querySelectorAll('#cseg button').forEach(b=>b.classList.toggle('on',b.dataset.c===m));
+  if(m!=='off'&&map.getZoom()<9.5){const c=map.getCenter();map.flyTo(c,10,{duration:.8})}
+  drawCities();loadCities()}
+$('#cseg').onclick=e=>{e.stopPropagation();const b=e.target.closest('button');if(b)setCmode(b.dataset.c)};
+map.on('moveend',()=>{clearTimeout(cTimer);if(cmode!=='off'){drawCities();cTimer=setTimeout(loadCities,600)}});
+function openCity(p,col){cityPart={p,col};$('#cName').textContent=p.n;$('#cInfo').textContent=fa(p.a)+' · city area from OpenStreetMap';$('#cSw').style.background=col;$('#cSw').innerHTML=TI.area;sheet('#citySheet')}
+$('#cClose').onclick=()=>{$('#citySheet').classList.remove('on');open=null;$('#back').classList.remove('on')};
+$('#cSave').onclick=()=>{if(!cityPart)return;const {p,col}=cityPart;const big=p.o.reduce((a,r)=>area(r)>area(a)?r:a,p.o[0]);
+  const it={id:uid(),type:'area',name:p.n,color:col,note:'',pts:big.map(q=>[+q[0].toFixed(5),+q[1].toFixed(5)]),t:Date.now()};
+  commit(()=>items.push(it));newIds.add(it.id);render();$('#cClose').onclick();toast(`Saved “${p.n}” to your map`)};
+document.querySelectorAll('#cseg button').forEach(b=>b.classList.toggle('on',b.dataset.c===cmode));
+markR();badge();setMode('pan');if(cmode!=='off')loadCities();
 }
 </script>
 </body>
